@@ -5,14 +5,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local Player = Players.LocalPlayer
-local speed = 200
-local flyHeight = 10
+local speed = 50
+local flyHeight = 15
 local active = false
 local activeTween = nil
 local targetMobName = ""
 
+-- Fruit Variables
+local NotifierEnabled = false
+local CurrentFruit = nil
+local WorkspaceConnection = nil
+
 -----------------------------------
--- MODERN GUI SETUP
+-- MODERN GUI SETUP (EXPANDED)
 -----------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BaunaGayGUI"
@@ -27,114 +32,173 @@ end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 240, 0, 265)
-MainFrame.Position = UDim2.new(0.5, -120, 0.4, 0)
+MainFrame.Size = UDim2.new(0, 240, 0, 340)
+MainFrame.Position = UDim2.new(0.5, -120, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
+local UICorner = Instance.new("UICorner", MainFrame)
 UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
 
-local UIStroke = Instance.new("UIStroke")
+local UIStroke = Instance.new("UIStroke", MainFrame)
 UIStroke.Color = Color3.fromRGB(70, 70, 100)
 UIStroke.Thickness = 1.5
-UIStroke.Parent = MainFrame
 
 local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Name = "Title"
-TitleLabel.Size = UDim2.new(1, 0, 0, 32)
+TitleLabel.Size = UDim2.new(1, -40, 0, 32)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "BAUNA GAY HUB v67"
+TitleLabel.Text = "BAUNA GAY HUB v7.0"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 15
 TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = MainFrame
 
+-- Minimize / Maximize Button
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+MinimizeBtn.Position = UDim2.new(1, -30, 0, 4)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 14
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.Parent = MainFrame
+Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
+
+-- Container to hold all interactive UI elements during minimize
+local Container = Instance.new("Frame")
+Container.Size = UDim2.new(1, 0, 1, -32)
+Container.Position = UDim2.new(0, 0, 0, 32)
+Container.BackgroundTransparency = 1
+Container.Parent = MainFrame
+
+local isMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        MinimizeBtn.Text = "+"
+        MainFrame.Size = UDim2.new(0, 240, 0, 32)
+        Container.Visible = false
+    else
+        MinimizeBtn.Text = "-"
+        MainFrame.Size = UDim2.new(0, 240, 0, 340)
+        Container.Visible = true
+    end
+end)
+
 local TargetLabel = Instance.new("TextLabel")
-TargetLabel.Name = "TargetLabel"
 TargetLabel.Size = UDim2.new(0.9, 0, 0, 20)
-TargetLabel.Position = UDim2.new(0.05, 0, 0, 32)
+TargetLabel.Position = UDim2.new(0.05, 0, 0, 0)
 TargetLabel.BackgroundTransparency = 1
 TargetLabel.Text = "Target: All Damageable"
 TargetLabel.TextColor3 = Color3.fromRGB(160, 160, 200)
 TargetLabel.TextSize = 12
 TargetLabel.Font = Enum.Font.Gotham
-TargetLabel.Parent = MainFrame
+TargetLabel.Parent = Container
 
 local DropdownBtn = Instance.new("TextButton")
-DropdownBtn.Name = "DropdownBtn"
 DropdownBtn.Size = UDim2.new(0.65, 0, 0, 30)
-DropdownBtn.Position = UDim2.new(0.05, 0, 0, 56)
+DropdownBtn.Position = UDim2.new(0.05, 0, 0, 24)
 DropdownBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
 DropdownBtn.Text = "Select Mob"
 DropdownBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
 DropdownBtn.TextSize = 13
 DropdownBtn.Font = Enum.Font.GothamSemibold
-DropdownBtn.Parent = MainFrame
+DropdownBtn.Parent = Container
 Instance.new("UICorner", DropdownBtn).CornerRadius = UDim.new(0, 6)
 
 local RefreshBtn = Instance.new("TextButton")
-RefreshBtn.Name = "RefreshBtn"
 RefreshBtn.Size = UDim2.new(0.2, 0, 0, 30)
-RefreshBtn.Position = UDim2.new(0.725, 0, 0, 56)
+RefreshBtn.Position = UDim2.new(0.725, 0, 0, 24)
 RefreshBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 220)
 RefreshBtn.Text = "Refresh"
 RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 RefreshBtn.TextSize = 12
 RefreshBtn.Font = Enum.Font.GothamBold
-RefreshBtn.Parent = MainFrame
+RefreshBtn.Parent = Container
 Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 6)
 
 local SpeedBox = Instance.new("TextBox")
-SpeedBox.Name = "SpeedBox"
 SpeedBox.Size = UDim2.new(0.9, 0, 0, 30)
-SpeedBox.Position = UDim2.new(0.05, 0, 0, 92)
+SpeedBox.Position = UDim2.new(0.05, 0, 0, 60)
 SpeedBox.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
 SpeedBox.Text = "Speed: " .. tostring(speed)
 SpeedBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 SpeedBox.TextSize = 12
 SpeedBox.Font = Enum.Font.Gotham
-SpeedBox.Parent = MainFrame
+SpeedBox.Parent = Container
 Instance.new("UICorner", SpeedBox).CornerRadius = UDim.new(0, 6)
 
 local HeightBox = Instance.new("TextBox")
-HeightBox.Name = "HeightBox"
 HeightBox.Size = UDim2.new(0.9, 0, 0, 30)
-HeightBox.Position = UDim2.new(0.05, 0, 0, 128)
+HeightBox.Position = UDim2.new(0.05, 0, 0, 96)
 HeightBox.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
 HeightBox.Text = "Fly Height: " .. tostring(flyHeight)
 HeightBox.TextColor3 = Color3.fromRGB(220, 220, 220)
 HeightBox.TextSize = 12
 HeightBox.Font = Enum.Font.Gotham
-HeightBox.Parent = MainFrame
+HeightBox.Parent = Container
 Instance.new("UICorner", HeightBox).CornerRadius = UDim.new(0, 6)
 
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleButton"
 ToggleButton.Size = UDim2.new(0.9, 0, 0, 36)
-ToggleButton.Position = UDim2.new(0.05, 0, 0, 168)
+ToggleButton.Position = UDim2.new(0.05, 0, 0, 136)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
-ToggleButton.Text = "Start"
+ToggleButton.Text = "Start Auto Farm"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextSize = 14
 ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = MainFrame
+ToggleButton.Parent = Container
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 
+local NotifierBtn = Instance.new("TextButton")
+NotifierBtn.Size = UDim2.new(0.9, 0, 0, 30)
+NotifierBtn.Position = UDim2.new(0.05, 0, 0, 178)
+NotifierBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+NotifierBtn.Text = "Fruit Notifier: OFF"
+NotifierBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NotifierBtn.TextSize = 13
+NotifierBtn.Font = Enum.Font.GothamBold
+NotifierBtn.Parent = Container
+Instance.new("UICorner", NotifierBtn).CornerRadius = UDim.new(0, 6)
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 42)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 214)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 200)
+StatusLabel.TextSize = 11
+StatusLabel.TextWrapped = true
+StatusLabel.Text = "Status: Disabled"
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Parent = Container
+Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 6)
+
+local TPBtn = Instance.new("TextButton")
+TPBtn.Size = UDim2.new(0.9, 0, 0, 32)
+TPBtn.Position = UDim2.new(0.05, 0, 0, 264)
+TPBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 150)
+TPBtn.Text = "TP to Spawned Fruit"
+TPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TPBtn.TextSize = 13
+TPBtn.Font = Enum.Font.GothamBold
+TPBtn.Parent = Container
+Instance.new("UICorner", TPBtn).CornerRadius = UDim.new(0, 6)
+
 local MobScrollFrame = Instance.new("ScrollingFrame")
-MobScrollFrame.Name = "MobScrollFrame"
 MobScrollFrame.Size = UDim2.new(0.9, 0, 0, 110)
-MobScrollFrame.Position = UDim2.new(0.05, 0, 0, 90)
+MobScrollFrame.Position = UDim2.new(0.05, 0, 0, 58)
 MobScrollFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MobScrollFrame.BorderSizePixel = 0
 MobScrollFrame.ScrollBarThickness = 4
 MobScrollFrame.Visible = false
 MobScrollFrame.ZIndex = 10
-MobScrollFrame.Parent = MainFrame
+MobScrollFrame.Parent = Container
 Instance.new("UICorner", MobScrollFrame).CornerRadius = UDim.new(0, 6)
 
 local UIListLayout = Instance.new("UIListLayout")
@@ -143,12 +207,11 @@ UIListLayout.Padding = UDim.new(0, 3)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -----------------------------------
--- STRICT DAMAGEABLE NPC CHECK (NO PLAYERS / NO QUEST NPCS)
+-- STRICT DAMAGEABLE NPC CHECK
 -----------------------------------
 local function IsDamageableNPC(model)
     if not model or not model:IsA("Model") then return false end
     if model == Player.Character then return false end
-    
     if Players:GetPlayerFromCharacter(model) then return false end
     
     local hum = model:FindFirstChildOfClass("Humanoid")
@@ -156,7 +219,6 @@ local function IsDamageableNPC(model)
     
     if not hum or not root then return false end
     if hum.Health <= 0 then return false end
-    
     if hum.MaxHealth >= 999999 or hum.MaxHealth <= 0 then return false end
     
     local nameLower = model.Name:lower()
@@ -170,7 +232,6 @@ end
 local function GetAvailableMobs()
     local mobs = {}
     local hash = {}
-    
     for _, desc in ipairs(Workspace:GetDescendants()) do
         if IsDamageableNPC(desc) then
             if not hash[desc.Name] then
@@ -189,7 +250,6 @@ local function populateDropdown()
     end
     
     local mobs = GetAvailableMobs()
-    
     local function createBtn(text, tName, order)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, -6, 0, 26)
@@ -214,7 +274,6 @@ local function populateDropdown()
     for i, mobName in ipairs(mobs) do
         createBtn(mobName, mobName, i)
     end
-    
     MobScrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#mobs + 1) * 29)
 end
 
@@ -222,7 +281,6 @@ DropdownBtn.MouseButton1Click:Connect(function()
     populateDropdown()
     MobScrollFrame.Visible = not MobScrollFrame.Visible
 end)
-
 RefreshBtn.MouseButton1Click:Connect(populateDropdown)
 
 SpeedBox.FocusLost:Connect(function()
@@ -236,49 +294,115 @@ HeightBox.FocusLost:Connect(function()
     if num and num >= 0 then flyHeight = num end
     HeightBox.Text = "Fly Height: " .. tostring(flyHeight)
 end)
-
 populateDropdown()
 
 -----------------------------------
--- ORIGINAL USER DAMAGE SYSTEM (INTEGRATED)
+-- FRUIT NOTIFIER & TP LOGIC
+-----------------------------------
+local function getFruitName(fruit)
+    local fruitName = "Unknown Fruit"
+    for _, descendant in ipairs(fruit:GetChildren()) do
+        if descendant:IsA("MeshPart") and string.sub(descendant.Name, 1, 7) == "Meshes/" then
+            local i = string.find(descendant.Name, '_')
+            fruitName = i and string.sub(descendant.Name, 8, i - 1) or string.sub(descendant.Name, 8)
+            
+            local lowerName = string.lower(fruitName)
+            if lowerName == "magu" then fruitName = "Magma"
+            elseif lowerName == "smouke" then fruitName = "Smoke"
+            elseif lowerName == "quaketest" then fruitName = "Quake"
+            end
+            
+            fruitName = fruitName:gsub("^%l", string.upper) .. " Fruit"
+            fruitName = fruitName:gsub("%d+", '')
+            break
+        end
+    end
+    if fruitName == "Unknown Fruit" then fruitName = fruit.Name end
+    return fruitName
+end
+
+local function scanForFruits()
+    CurrentFruit = nil
+    for _, child in ipairs(Workspace:GetChildren()) do
+        if string.find(child.Name, "Fruit") or child.Name == "Fruit " then
+            local handle = child:FindFirstChild("Handle") or child:FindFirstChildOfClass("Part") or child:FindFirstChildOfClass("MeshPart")
+            if handle then
+                CurrentFruit = child
+                break
+            end
+        end
+    end
+end
+
+local function trackFruit(fruit)
+    CurrentFruit = fruit
+    local handle = fruit:WaitForChild("Handle", 5) or fruit:FindFirstChildOfClass("Part") or fruit:FindFirstChildOfClass("MeshPart")
+    if not handle then return end
+    
+    local name = getFruitName(fruit)
+    task.spawn(function()
+        while NotifierEnabled and fruit and fruit.Parent == Workspace do
+            if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                local pos = handle.Position
+                local dist = math.floor((Player.Character.HumanoidRootPart.Position - pos).Magnitude * 0.15)
+                StatusLabel.Text = string.format("%s Detected!\nDist: %dm away", name, dist)
+            end
+            task.wait(0.3)
+        end
+        if NotifierEnabled then
+            scanForFruits()
+            if not CurrentFruit then
+                StatusLabel.Text = "Status: No fruit currently spawned"
+            end
+        end
+    end)
+end
+
+NotifierBtn.MouseButton1Click:Connect(function()
+    NotifierEnabled = not NotifierEnabled
+    if NotifierEnabled then
+        NotifierBtn.Text = "Fruit Notifier: ON"
+        NotifierBtn.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
+        StatusLabel.Text = "Status: Searching for fruits..."
+        
+        WorkspaceConnection = Workspace.ChildAdded:Connect(function(child)
+            if string.find(child.Name, "Fruit") or child.Name == "Fruit " then
+                trackFruit(child)
+            end
+        end)
+        
+        scanForFruits()
+        if CurrentFruit then trackFruit(CurrentFruit) else StatusLabel.Text = "Status: No fruit currently spawned" end
+    else
+        NotifierBtn.Text = "Fruit Notifier: OFF"
+        NotifierBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+        StatusLabel.Text = "Status: Disabled"
+        if WorkspaceConnection then WorkspaceConnection:Disconnect() WorkspaceConnection = nil end
+        CurrentFruit = nil
+    end
+end)
+-----------------------------------
+-- ORIGINAL USER DAMAGE SYSTEM (FAST ATTACK)
 -----------------------------------
 _G.FastAttack = true
-
 if _G.FastAttack then
     local _ENV = (getgenv or getrenv or getfenv)()
-
     local function SafeWaitForChild(parent, childName)
-        local success, result = pcall(function()
-            return parent:WaitForChild(childName)
-        end)
+        local success, result = pcall(function() return parent:WaitForChild(childName) end)
         return result
     end
-
     local Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes")
     local Characters = SafeWaitForChild(Workspace, "Characters")
     local Enemies = SafeWaitForChild(Workspace, "Enemies")
     local Modules = SafeWaitForChild(ReplicatedStorage, "Modules")
     local Net = SafeWaitForChild(Modules, "Net")
 
-    local Settings = {
-        AutoClick = true,
-        ClickDelay = 0.0000000000001
-    }
-
+    local Settings = { AutoClick = true, ClickDelay = 0.0000000000001 }
     local Module = {}
 
     Module.FastAttack = (function()
-        if _ENV.rz_FastAttack then
-            return _ENV.rz_FastAttack
-        end
-
-        local FastAttack = {
-            Distance = 500,
-            attackMobs = true,
-            attackPlayers = true,
-            Equipped = nil
-        }
-
+        if _ENV.rz_FastAttack then return _ENV.rz_FastAttack end
+        local FastAttack = { Distance = 500, attackMobs = true, attackPlayers = true, Equipped = nil }
         local RegisterAttack = SafeWaitForChild(Net, "RE/RegisterAttack")
         local RegisterHit = SafeWaitForChild(Net, "RE/RegisterHit")
 
@@ -343,9 +467,7 @@ if _G.FastAttack then
                     local hrp = enemy:FindFirstChild("HumanoidRootPart")
                     if hrp then
                         local direction = (hrp.Position - character:GetPivot().Position).Unit
-                        pcall(function()
-                            equippedWeapon.LeftClickRemote:FireServer(direction, 1)
-                        end)
+                        pcall(function() equippedWeapon.LeftClickRemote:FireServer(direction, 1) end)
                     end
                 end
             elseif #OthersEnemies > 0 then
@@ -398,7 +520,6 @@ end)
 task.spawn(function()
     while task.wait(0.05) do
         if not active then continue end 
-        
         local char = Player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then continue end
@@ -439,7 +560,7 @@ task.spawn(function()
 end)
 
 -----------------------------------
--- MOVEMENT & SUSPENSION SYSTEM (NO ANCHOR)
+-- MOVEMENT & SUSPENSION SYSTEM 
 -----------------------------------
 local function applySuspension(hrp)
     local bv = hrp:FindFirstChild("AutoFarmVelocity")
@@ -523,7 +644,6 @@ local function startLoop()
     task.spawn(function()
         while active do
             local targetHrp, targetHumanoid = getNearestNPC()
-            
             if targetHrp and targetHumanoid then
                 local overheadCFrame = targetHrp.CFrame * CFrame.new(0, flyHeight, 0)
                 local arrived = tweenToPosition(overheadCFrame)
@@ -533,7 +653,6 @@ local function startLoop()
                     if char and char:FindFirstChild("HumanoidRootPart") then
                         local hrp = char.HumanoidRootPart
                         applySuspension(hrp)
-                        
                         while active and targetHumanoid and targetHumanoid.Health > 0 and targetHrp and targetHrp.Parent do
                             hrp.CFrame = targetHrp.CFrame * CFrame.new(0, flyHeight, 0)
                             task.wait()
@@ -550,7 +669,7 @@ local function startLoop()
 end
 
 -----------------------------------
--- TOGGLE & J KEY (HAKI) / DEATH BINDINGS
+-- TOGGLES, BINDINGS & TP EXECUTION
 -----------------------------------
 local function pressJ()
     pcall(function()
@@ -565,11 +684,11 @@ local function toggleScript()
     pressJ()
 
     if active then
-        ToggleButton.Text = "Stop"
+        ToggleButton.Text = "Stop Auto Farm"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
         startLoop()
     else
-        ToggleButton.Text = "Start"
+        ToggleButton.Text = "Start Auto Farm"
         ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
         
         if activeTween then
@@ -579,8 +698,27 @@ local function toggleScript()
         removeSuspension()
     end
 end
-
 ToggleButton.MouseButton1Click:Connect(toggleScript)
+
+TPBtn.MouseButton1Click:Connect(function()
+    if CurrentFruit then
+        local handle = CurrentFruit:FindFirstChild("Handle") or CurrentFruit:FindFirstChildOfClass("Part") or CurrentFruit:FindFirstChildOfClass("MeshPart")
+        if handle then
+            if active then
+                toggleScript() 
+            end
+            
+            if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                Player.Character.HumanoidRootPart.CFrame = CFrame.new(handle.Position + Vector3.new(0, 4, 0))
+                StatusLabel.Text = "Teleported to " .. getFruitName(CurrentFruit)
+            end
+        else
+            StatusLabel.Text = "Error: Fruit model missing handle"
+        end
+    else
+        StatusLabel.Text = "No active fruit to teleport to!"
+    end
+end)
 
 local function setupDeathListener(char)
     local hum = char:WaitForChild("Humanoid", 5)
@@ -602,3 +740,4 @@ end)
 if Player.Character then
     setupDeathListener(Player.Character)
 end
+
