@@ -5,19 +5,20 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local Player = Players.LocalPlayer
+local scriptRunning = true
 local speed = 200
 local flyHeight = 10
 local active = false
 local activeTween = nil
-local targetMobName = ""
+local targetMobs = {} 
+local attackMultiplier = 1 
 
--- Fruit Variables
 local NotifierEnabled = false
 local CurrentFruit = nil
 local WorkspaceConnection = nil
 
 -----------------------------------
--- MODERN GUI SETUP (EXPANDED)
+-- UI SETUP (BLACK UP / PURPLE DOWN)
 -----------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "BaunaGayGUI"
@@ -30,39 +31,93 @@ else
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 end
 
+-- Confirmation Menu Overlay
+local ConfirmOverlay = Instance.new("Frame")
+ConfirmOverlay.Size = UDim2.new(1, 0, 1, 0)
+ConfirmOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+ConfirmOverlay.BackgroundTransparency = 0.6
+ConfirmOverlay.Visible = false
+ConfirmOverlay.ZIndex = 50
+ConfirmOverlay.Parent = ScreenGui
+
+local ConfirmBox = Instance.new("Frame")
+ConfirmBox.Size = UDim2.new(0, 260, 0, 120)
+ConfirmBox.Position = UDim2.new(0.5, -130, 0.5, -60)
+ConfirmBox.BackgroundColor3 = Color3.fromRGB(20, 10, 30)
+ConfirmBox.ZIndex = 51
+ConfirmBox.Parent = ConfirmOverlay
+Instance.new("UICorner", ConfirmBox).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", ConfirmBox).Color = Color3.fromRGB(150, 50, 255)
+
+local ConfirmText = Instance.new("TextLabel")
+ConfirmText.Size = UDim2.new(1, -20, 0, 60)
+ConfirmText.Position = UDim2.new(0, 10, 0, 10)
+ConfirmText.BackgroundTransparency = 1
+ConfirmText.Text = "Are you sure you want to close the script?"
+ConfirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
+ConfirmText.TextWrapped = true
+ConfirmText.Font = Enum.Font.GothamBold
+ConfirmText.TextSize = 14
+ConfirmText.ZIndex = 52
+ConfirmText.Parent = ConfirmBox
+
+local YesBtn = Instance.new("TextButton")
+YesBtn.Size = UDim2.new(0, 100, 0, 30)
+YesBtn.Position = UDim2.new(0, 20, 1, -40)
+YesBtn.BackgroundColor3 = Color3.fromRGB(120, 30, 160)
+YesBtn.Text = "Yes"
+YesBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+YesBtn.Font = Enum.Font.GothamBold
+YesBtn.ZIndex = 52
+YesBtn.Parent = ConfirmBox
+Instance.new("UICorner", YesBtn).CornerRadius = UDim.new(0, 4)
+
+local NoBtn = Instance.new("TextButton")
+NoBtn.Size = UDim2.new(0, 100, 0, 30)
+NoBtn.Position = UDim2.new(1, -120, 1, -40)
+NoBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+NoBtn.Text = "No"
+NoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoBtn.Font = Enum.Font.GothamBold
+NoBtn.ZIndex = 52
+NoBtn.Parent = ConfirmBox
+Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 4)
+
+-- Main Frame Setup
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 240, 0, 340)
+MainFrame.Size = UDim2.new(0, 240, 0, 380) 
 MainFrame.Position = UDim2.new(0.5, -120, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
-local UICorner = Instance.new("UICorner", MainFrame)
-UICorner.CornerRadius = UDim.new(0, 10)
-
-local UIStroke = Instance.new("UIStroke", MainFrame)
-UIStroke.Color = Color3.fromRGB(70, 70, 100)
-UIStroke.Thickness = 1.5
+-- Black Top, Purple Bottom Gradient
+local BgGradient = Instance.new("UIGradient", MainFrame)
+BgGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(10, 10, 15)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 20, 140))
+})
+BgGradient.Rotation = 90 
 
 local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Size = UDim2.new(1, -40, 0, 32)
+TitleLabel.Size = UDim2.new(1, -70, 0, 32)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "👨‍❤️‍👨 BAUNA GAY HUB v67 👨‍❤️‍👨"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-TitleLabel.TextSize = 15
+TitleLabel.Text = "BANTHA HUB"
+TitleLabel.TextColor3 = Color3.fromRGB(220, 180, 255)
+TitleLabel.TextSize = 14
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 TitleLabel.Parent = MainFrame
 
--- Minimize / Maximize Button
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
-MinimizeBtn.Position = UDim2.new(1, -30, 0, 4)
-MinimizeBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+MinimizeBtn.Position = UDim2.new(1, -58, 0, 4)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 15, 60)
 MinimizeBtn.Text = "-"
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeBtn.TextSize = 14
@@ -70,7 +125,17 @@ MinimizeBtn.Font = Enum.Font.GothamBold
 MinimizeBtn.Parent = MainFrame
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
 
--- Container to hold all interactive UI elements during minimize
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+CloseBtn.Position = UDim2.new(1, -30, 0, 4)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 12
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = MainFrame
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
+
 local Container = Instance.new("Frame")
 Container.Size = UDim2.new(1, 0, 1, -32)
 Container.Position = UDim2.new(0, 0, 0, 32)
@@ -86,9 +151,17 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         Container.Visible = false
     else
         MinimizeBtn.Text = "-"
-        MainFrame.Size = UDim2.new(0, 240, 0, 340)
+        MainFrame.Size = UDim2.new(0, 240, 0, 380)
         Container.Visible = true
     end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ConfirmOverlay.Visible = true
+end)
+
+NoBtn.MouseButton1Click:Connect(function()
+    ConfirmOverlay.Visible = false
 end)
 
 local TargetLabel = Instance.new("TextLabel")
@@ -96,18 +169,19 @@ TargetLabel.Size = UDim2.new(0.9, 0, 0, 20)
 TargetLabel.Position = UDim2.new(0.05, 0, 0, 0)
 TargetLabel.BackgroundTransparency = 1
 TargetLabel.Text = "Target: All Damageable"
-TargetLabel.TextColor3 = Color3.fromRGB(160, 160, 200)
+TargetLabel.TextColor3 = Color3.fromRGB(200, 170, 230)
 TargetLabel.TextSize = 12
 TargetLabel.Font = Enum.Font.Gotham
+TargetLabel.TextTruncate = Enum.TextTruncate.AtEnd
 TargetLabel.Parent = Container
 
 local DropdownBtn = Instance.new("TextButton")
 DropdownBtn.Size = UDim2.new(0.65, 0, 0, 30)
 DropdownBtn.Position = UDim2.new(0.05, 0, 0, 24)
-DropdownBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
-DropdownBtn.Text = "Select Mob"
+DropdownBtn.BackgroundColor3 = Color3.fromRGB(60, 30, 90)
+DropdownBtn.Text = "Select Mobs (Multi)"
 DropdownBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
-DropdownBtn.TextSize = 13
+DropdownBtn.TextSize = 12
 DropdownBtn.Font = Enum.Font.GothamSemibold
 DropdownBtn.Parent = Container
 Instance.new("UICorner", DropdownBtn).CornerRadius = UDim.new(0, 6)
@@ -115,10 +189,10 @@ Instance.new("UICorner", DropdownBtn).CornerRadius = UDim.new(0, 6)
 local RefreshBtn = Instance.new("TextButton")
 RefreshBtn.Size = UDim2.new(0.2, 0, 0, 30)
 RefreshBtn.Position = UDim2.new(0.725, 0, 0, 24)
-RefreshBtn.BackgroundColor3 = Color3.fromRGB(60, 100, 220)
+RefreshBtn.BackgroundColor3 = Color3.fromRGB(100, 50, 180)
 RefreshBtn.Text = "Refresh"
 RefreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-RefreshBtn.TextSize = 12
+RefreshBtn.TextSize = 11
 RefreshBtn.Font = Enum.Font.GothamBold
 RefreshBtn.Parent = Container
 Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 6)
@@ -126,9 +200,9 @@ Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 6)
 local SpeedBox = Instance.new("TextBox")
 SpeedBox.Size = UDim2.new(0.9, 0, 0, 30)
 SpeedBox.Position = UDim2.new(0.05, 0, 0, 60)
-SpeedBox.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+SpeedBox.BackgroundColor3 = Color3.fromRGB(20, 10, 35)
 SpeedBox.Text = "Speed: " .. tostring(speed)
-SpeedBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+SpeedBox.TextColor3 = Color3.fromRGB(220, 200, 255)
 SpeedBox.TextSize = 12
 SpeedBox.Font = Enum.Font.Gotham
 SpeedBox.Parent = Container
@@ -137,18 +211,29 @@ Instance.new("UICorner", SpeedBox).CornerRadius = UDim.new(0, 6)
 local HeightBox = Instance.new("TextBox")
 HeightBox.Size = UDim2.new(0.9, 0, 0, 30)
 HeightBox.Position = UDim2.new(0.05, 0, 0, 96)
-HeightBox.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+HeightBox.BackgroundColor3 = Color3.fromRGB(20, 10, 35)
 HeightBox.Text = "Fly Height: " .. tostring(flyHeight)
-HeightBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+HeightBox.TextColor3 = Color3.fromRGB(220, 200, 255)
 HeightBox.TextSize = 12
 HeightBox.Font = Enum.Font.Gotham
 HeightBox.Parent = Container
 Instance.new("UICorner", HeightBox).CornerRadius = UDim.new(0, 6)
 
+local AtkMultBox = Instance.new("TextBox")
+AtkMultBox.Size = UDim2.new(0.9, 0, 0, 30)
+AtkMultBox.Position = UDim2.new(0.05, 0, 0, 132)
+AtkMultBox.BackgroundColor3 = Color3.fromRGB(35, 10, 50)
+AtkMultBox.Text = "Atk Multiplier: " .. tostring(attackMultiplier) .. "x"
+AtkMultBox.TextColor3 = Color3.fromRGB(255, 150, 255)
+AtkMultBox.TextSize = 12
+AtkMultBox.Font = Enum.Font.GothamBold
+AtkMultBox.Parent = Container
+Instance.new("UICorner", AtkMultBox).CornerRadius = UDim.new(0, 6)
+
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0.9, 0, 0, 36)
-ToggleButton.Position = UDim2.new(0.05, 0, 0, 136)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+ToggleButton.Position = UDim2.new(0.05, 0, 0, 172)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(120, 30, 160)
 ToggleButton.Text = "Start Auto Farm"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextSize = 14
@@ -158,8 +243,8 @@ Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 
 local NotifierBtn = Instance.new("TextButton")
 NotifierBtn.Size = UDim2.new(0.9, 0, 0, 30)
-NotifierBtn.Position = UDim2.new(0.05, 0, 0, 178)
-NotifierBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+NotifierBtn.Position = UDim2.new(0.05, 0, 0, 214)
+NotifierBtn.BackgroundColor3 = Color3.fromRGB(45, 25, 70)
 NotifierBtn.Text = "Fruit Notifier: OFF"
 NotifierBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 NotifierBtn.TextSize = 13
@@ -169,9 +254,9 @@ Instance.new("UICorner", NotifierBtn).CornerRadius = UDim.new(0, 6)
 
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 42)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 214)
-StatusLabel.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 200)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 250)
+StatusLabel.BackgroundColor3 = Color3.fromRGB(35, 15, 55)
+StatusLabel.TextColor3 = Color3.fromRGB(200, 170, 240)
 StatusLabel.TextSize = 11
 StatusLabel.TextWrapped = true
 StatusLabel.Text = "Status: Disabled"
@@ -181,8 +266,8 @@ Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 6)
 
 local TPBtn = Instance.new("TextButton")
 TPBtn.Size = UDim2.new(0.9, 0, 0, 32)
-TPBtn.Position = UDim2.new(0.05, 0, 0, 264)
-TPBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 150)
+TPBtn.Position = UDim2.new(0.05, 0, 0, 300)
+TPBtn.BackgroundColor3 = Color3.fromRGB(90, 20, 150)
 TPBtn.Text = "TP to Spawned Fruit"
 TPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 TPBtn.TextSize = 13
@@ -191,9 +276,9 @@ TPBtn.Parent = Container
 Instance.new("UICorner", TPBtn).CornerRadius = UDim.new(0, 6)
 
 local MobScrollFrame = Instance.new("ScrollingFrame")
-MobScrollFrame.Size = UDim2.new(0.9, 0, 0, 110)
+MobScrollFrame.Size = UDim2.new(0.9, 0, 0, 140)
 MobScrollFrame.Position = UDim2.new(0.05, 0, 0, 58)
-MobScrollFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+MobScrollFrame.BackgroundColor3 = Color3.fromRGB(20, 10, 30)
 MobScrollFrame.BorderSizePixel = 0
 MobScrollFrame.ScrollBarThickness = 4
 MobScrollFrame.Visible = false
@@ -207,7 +292,7 @@ UIListLayout.Padding = UDim.new(0, 3)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -----------------------------------
--- STRICT DAMAGEABLE NPC CHECK
+-- STRICT DAMAGEABLE NPC CHECK & MULTI-SELECT
 -----------------------------------
 local function IsDamageableNPC(model)
     if not model or not model:IsA("Model") then return false end
@@ -244,6 +329,18 @@ local function GetAvailableMobs()
     return mobs
 end
 
+local function updateTargetLabel()
+    local names = {}
+    for k, v in pairs(targetMobs) do 
+        if v then table.insert(names, k) end 
+    end
+    if #names > 0 then
+        TargetLabel.Text = "Target: " .. table.concat(names, ", ")
+    else
+        TargetLabel.Text = "Target: All Damageable"
+    end
+end
+
 local function populateDropdown()
     for _, child in ipairs(MobScrollFrame:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -253,7 +350,7 @@ local function populateDropdown()
     local function createBtn(text, tName, order)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(1, -6, 0, 26)
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        btn.BackgroundColor3 = (targetMobs[tName] or (tName == "" and next(targetMobs) == nil)) and Color3.fromRGB(130, 40, 220) or Color3.fromRGB(40, 20, 60)
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(230, 230, 230)
         btn.TextSize = 12
@@ -264,9 +361,23 @@ local function populateDropdown()
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
         
         btn.MouseButton1Click:Connect(function()
-            targetMobName = tName
-            TargetLabel.Text = "Target: " .. (text == "All Damageable" and "All" or text)
-            MobScrollFrame.Visible = false
+            if tName == "" then
+                targetMobs = {}
+                for _, b in ipairs(MobScrollFrame:GetChildren()) do
+                    if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(40, 20, 60) end
+                end
+                btn.BackgroundColor3 = Color3.fromRGB(130, 40, 220)
+            else
+                targetMobs[tName] = not targetMobs[tName]
+                btn.BackgroundColor3 = targetMobs[tName] and Color3.fromRGB(130, 40, 220) or Color3.fromRGB(40, 20, 60)
+                
+                for _, b in ipairs(MobScrollFrame:GetChildren()) do
+                    if b:IsA("TextButton") and b.Text == "All Damageable" then
+                        b.BackgroundColor3 = Color3.fromRGB(40, 20, 60)
+                    end
+                end
+            end
+            updateTargetLabel()
         end)
     end
 
@@ -294,8 +405,14 @@ HeightBox.FocusLost:Connect(function()
     if num and num >= 0 then flyHeight = num end
     HeightBox.Text = "Fly Height: " .. tostring(flyHeight)
 end)
-populateDropdown()
 
+AtkMultBox.FocusLost:Connect(function()
+    local num = tonumber(AtkMultBox.Text:match("%d+"))
+    if num and num > 0 then attackMultiplier = math.clamp(num, 1, 100) end
+    AtkMultBox.Text = "Atk Multiplier: " .. tostring(attackMultiplier) .. "x"
+end)
+
+populateDropdown()
 -----------------------------------
 -- FRUIT NOTIFIER & TP LOGIC
 -----------------------------------
@@ -305,13 +422,11 @@ local function getFruitName(fruit)
         if descendant:IsA("MeshPart") and string.sub(descendant.Name, 1, 7) == "Meshes/" then
             local i = string.find(descendant.Name, '_')
             fruitName = i and string.sub(descendant.Name, 8, i - 1) or string.sub(descendant.Name, 8)
-            
             local lowerName = string.lower(fruitName)
             if lowerName == "magu" then fruitName = "Magma"
             elseif lowerName == "smouke" then fruitName = "Smoke"
             elseif lowerName == "quaketest" then fruitName = "Quake"
             end
-            
             fruitName = fruitName:gsub("^%l", string.upper) .. " Fruit"
             fruitName = fruitName:gsub("%d+", '')
             break
@@ -341,7 +456,7 @@ local function trackFruit(fruit)
     
     local name = getFruitName(fruit)
     task.spawn(function()
-        while NotifierEnabled and fruit and fruit.Parent == Workspace do
+        while scriptRunning and NotifierEnabled and fruit and fruit.Parent == Workspace do
             if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
                 local pos = handle.Position
                 local dist = math.floor((Player.Character.HumanoidRootPart.Position - pos).Magnitude * 0.15)
@@ -349,7 +464,7 @@ local function trackFruit(fruit)
             end
             task.wait(0.3)
         end
-        if NotifierEnabled then
+        if scriptRunning and NotifierEnabled then
             scanForFruits()
             if not CurrentFruit then
                 StatusLabel.Text = "Status: No fruit currently spawned"
@@ -362,7 +477,7 @@ NotifierBtn.MouseButton1Click:Connect(function()
     NotifierEnabled = not NotifierEnabled
     if NotifierEnabled then
         NotifierBtn.Text = "Fruit Notifier: ON"
-        NotifierBtn.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
+        NotifierBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
         StatusLabel.Text = "Status: Searching for fruits..."
         
         WorkspaceConnection = Workspace.ChildAdded:Connect(function(child)
@@ -375,14 +490,15 @@ NotifierBtn.MouseButton1Click:Connect(function()
         if CurrentFruit then trackFruit(CurrentFruit) else StatusLabel.Text = "Status: No fruit currently spawned" end
     else
         NotifierBtn.Text = "Fruit Notifier: OFF"
-        NotifierBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
+        NotifierBtn.BackgroundColor3 = Color3.fromRGB(45, 25, 70)
         StatusLabel.Text = "Status: Disabled"
         if WorkspaceConnection then WorkspaceConnection:Disconnect() WorkspaceConnection = nil end
         CurrentFruit = nil
     end
 end)
+
 -----------------------------------
--- ORIGINAL USER DAMAGE SYSTEM (FAST ATTACK)
+-- MODIFIED USER DAMAGE SYSTEM (FAST ATTACK WITH MULTIPLIER)
 -----------------------------------
 _G.FastAttack = true
 if _G.FastAttack then
@@ -415,7 +531,7 @@ if _G.FastAttack then
             if not Folder then return BasePart end
             for _, Enemy in ipairs(Folder:GetChildren()) do
                 if IsDamageableNPC(Enemy) then
-                    if targetMobName == "" or Enemy.Name == targetMobName then
+                    if next(targetMobs) == nil or targetMobs[Enemy.Name] then
                         local Head = Enemy:FindFirstChild("Head")
                         if Head and Player:DistanceFromCharacter(Head.Position) < FastAttack.Distance then
                             table.insert(OthersEnemies, { Enemy, Head })
@@ -429,8 +545,12 @@ if _G.FastAttack then
 
         function FastAttack:Attack(BasePart, OthersEnemies)
             if not BasePart or #OthersEnemies == 0 then return end
-            if RegisterAttack then RegisterAttack:FireServer(Settings.ClickDelay or 0) end
-            if RegisterHit then RegisterHit:FireServer(BasePart, OthersEnemies) end
+            for i = 1, attackMultiplier do
+                task.spawn(function()
+                    if RegisterAttack then RegisterAttack:FireServer(Settings.ClickDelay or 0) end
+                    if RegisterHit then RegisterHit:FireServer(BasePart, OthersEnemies) end
+                end)
+            end
         end
 
         function FastAttack:AttackNearest()
@@ -441,7 +561,7 @@ if _G.FastAttack then
             local ExtraPart = nil
             for _, desc in ipairs(Workspace:GetDescendants()) do
                 if IsDamageableNPC(desc) then
-                    if targetMobName == "" or desc.Name == targetMobName then
+                    if next(targetMobs) == nil or targetMobs[desc.Name] then
                         local Head = desc:FindFirstChild("Head")
                         if Head and Player:DistanceFromCharacter(Head.Position) < FastAttack.Distance then
                             local exists = false
@@ -467,13 +587,15 @@ if _G.FastAttack then
                     local hrp = enemy:FindFirstChild("HumanoidRootPart")
                     if hrp then
                         local direction = (hrp.Position - character:GetPivot().Position).Unit
-                        pcall(function() equippedWeapon.LeftClickRemote:FireServer(direction, 1) end)
+                        for i = 1, attackMultiplier do
+                            task.spawn(function()
+                                pcall(function() equippedWeapon.LeftClickRemote:FireServer(direction, 1) end)
+                            end)
+                        end
                     end
                 end
             elseif #OthersEnemies > 0 then
                 self:Attack(Part1 or Part2 or ExtraPart, OthersEnemies)
-            else
-                task.wait(0)
             end
         end
 
@@ -481,13 +603,11 @@ if _G.FastAttack then
             local Equipped = IsAlive(Player.Character) and Player.Character:FindFirstChildOfClass("Tool")
             if Equipped and Equipped.ToolTip ~= "Gun" then
                 self:AttackNearest()
-            else
-                task.wait(0)
             end
         end
 
         task.spawn(function()
-            while task.wait(Settings.ClickDelay) do
+            while scriptRunning and task.wait(Settings.ClickDelay) do
                 if active and Settings.AutoClick then
                     FastAttack:BladeHits()
                 end
@@ -518,7 +638,7 @@ pcall(function()
 end)
 
 task.spawn(function()
-    while task.wait(0.05) do
+    while scriptRunning and task.wait(0.05) do
         if not active then continue end 
         local char = Player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -527,7 +647,7 @@ task.spawn(function()
         local parts = {}
         for _, desc in ipairs(Workspace:GetDescendants()) do
             if IsDamageableNPC(desc) then
-                if targetMobName == "" or desc.Name == targetMobName then
+                if next(targetMobs) == nil or targetMobs[desc.Name] then
                     local hrp = desc:FindFirstChild("HumanoidRootPart")
                     if hrp and (hrp.Position - root.Position).Magnitude <= 60 then
                         for _, _v in ipairs(desc:GetChildren()) do
@@ -542,19 +662,23 @@ task.spawn(function()
 
         local tool = char:FindFirstChildOfClass("Tool")
         if #parts > 0 and tool and (tool:GetAttribute("WeaponType") == "Melee" or tool:GetAttribute("WeaponType") == "Sword") then
-            pcall(function()
-                require(ReplicatedStorage.Modules.Net):RemoteEvent("RegisterHit", true)
-                ReplicatedStorage.Modules.Net["RE/RegisterAttack"]:FireServer()
-                local head = parts[1][1]:FindFirstChild("Head")
-                if not head then return end
-                ReplicatedStorage.Modules.Net["RE/RegisterHit"]:FireServer(head, parts, {}, tostring(Player.UserId):sub(2, 4) .. tostring(coroutine.running()):sub(11, 15))
-                if remote and idremote then
-                    cloneref(remote):FireServer(string.gsub("RE/RegisterHit", ".", function(c)
-                        return string.char(bit32.bxor(string.byte(c), math.floor(Workspace:GetServerTimeNow() / 10 % 10) + 1))
-                    end),
-                    bit32.bxor(idremote + 909090, ReplicatedStorage.Modules.Net.seed:InvokeServer() * 2), head, parts)
-                end
-            end)
+            for i = 1, attackMultiplier do
+                task.spawn(function()
+                    pcall(function()
+                        require(ReplicatedStorage.Modules.Net):RemoteEvent("RegisterHit", true)
+                        ReplicatedStorage.Modules.Net["RE/RegisterAttack"]:FireServer()
+                        local head = parts[1][1]:FindFirstChild("Head")
+                        if not head then return end
+                        ReplicatedStorage.Modules.Net["RE/RegisterHit"]:FireServer(head, parts, {}, tostring(Player.UserId):sub(2, 4) .. tostring(coroutine.running()):sub(11, 15))
+                        if remote and idremote then
+                            cloneref(remote):FireServer(string.gsub("RE/RegisterHit", ".", function(c)
+                                return string.char(bit32.bxor(string.byte(c), math.floor(Workspace:GetServerTimeNow() / 10 % 10) + 1))
+                            end),
+                            bit32.bxor(idremote + 909090, ReplicatedStorage.Modules.Net.seed:InvokeServer() * 2), head, parts)
+                        end
+                    end)
+                end)
+            end
         end
     end
 end)
@@ -592,7 +716,7 @@ local function getNearestNPC()
 
     for _, desc in ipairs(Workspace:GetDescendants()) do
         if IsDamageableNPC(desc) then
-            if targetMobName == "" or desc.Name == targetMobName then
+            if next(targetMobs) == nil or targetMobs[desc.Name] then
                 local targetHrp = desc:FindFirstChild("HumanoidRootPart") or desc:FindFirstChild("PrimaryPart")
                 local hum = desc:FindFirstChildOfClass("Humanoid")
                 if targetHrp and hum then
@@ -630,7 +754,7 @@ local function tweenToPosition(targetCFrame)
         if connection then connection:Disconnect() end
     end)
 
-    while not isDone and active do
+    while not isDone and active and scriptRunning do
         task.wait()
         if not char or not char:FindFirstChild("HumanoidRootPart") then
             if activeTween then activeTween:Cancel() end
@@ -642,18 +766,18 @@ end
 
 local function startLoop()
     task.spawn(function()
-        while active do
+        while active and scriptRunning do
             local targetHrp, targetHumanoid = getNearestNPC()
             if targetHrp and targetHumanoid then
                 local overheadCFrame = targetHrp.CFrame * CFrame.new(0, flyHeight, 0)
                 local arrived = tweenToPosition(overheadCFrame)
                 
-                if arrived and active then
+                if arrived and active and scriptRunning then
                     local char = Player.Character
                     if char and char:FindFirstChild("HumanoidRootPart") then
                         local hrp = char.HumanoidRootPart
                         applySuspension(hrp)
-                        while active and targetHumanoid and targetHumanoid.Health > 0 and targetHrp and targetHrp.Parent do
+                        while active and scriptRunning and targetHumanoid and targetHumanoid.Health > 0 and targetHrp and targetHrp.Parent do
                             hrp.CFrame = targetHrp.CFrame * CFrame.new(0, flyHeight, 0)
                             task.wait()
                         end
@@ -669,7 +793,7 @@ local function startLoop()
 end
 
 -----------------------------------
--- TOGGLES, BINDINGS & TP EXECUTION
+-- TOGGLES, BINDINGS & CLOSE EVENT
 -----------------------------------
 local function pressJ()
     pcall(function()
@@ -685,11 +809,11 @@ local function toggleScript()
 
     if active then
         ToggleButton.Text = "Stop Auto Farm"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 200, 80)
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(150, 50, 255)
         startLoop()
     else
         ToggleButton.Text = "Start Auto Farm"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(120, 30, 160)
         
         if activeTween then
             activeTween:Cancel()
@@ -712,12 +836,19 @@ TPBtn.MouseButton1Click:Connect(function()
                 Player.Character.HumanoidRootPart.CFrame = CFrame.new(handle.Position + Vector3.new(0, 4, 0))
                 StatusLabel.Text = "Teleported to " .. getFruitName(CurrentFruit)
             end
-        else
-            StatusLabel.Text = "Error: Fruit model missing handle"
         end
     else
         StatusLabel.Text = "No active fruit to teleport to!"
     end
+end)
+
+YesBtn.MouseButton1Click:Connect(function()
+    scriptRunning = false
+    active = false
+    if activeTween then activeTween:Cancel() end
+    if WorkspaceConnection then WorkspaceConnection:Disconnect() end
+    removeSuspension()
+    ScreenGui:Destroy()
 end)
 
 local function setupDeathListener(char)
@@ -730,6 +861,7 @@ local function setupDeathListener(char)
 end
 
 Player.CharacterAdded:Connect(function(newChar)
+    if not scriptRunning then return end
     setupDeathListener(newChar)
     if active then
         task.wait(1.5)
@@ -740,4 +872,3 @@ end)
 if Player.Character then
     setupDeathListener(Player.Character)
 end
-
