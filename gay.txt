@@ -18,10 +18,54 @@ local CurrentFruit = nil
 local WorkspaceConnection = nil
 
 -----------------------------------
+-- PERFORMANCE OPTIMIZATION (LAG FIX)
+-----------------------------------
+-- Drastically reduces lag by only checking relevant models instead of every descendant in the game
+local function getPotentialNPCs()
+    local npcs = {}
+    local enemiesFolder = Workspace:FindFirstChild("Enemies")
+    if enemiesFolder then
+        for _, obj in ipairs(enemiesFolder:GetChildren()) do 
+            table.insert(npcs, obj) 
+        end
+    end
+    for _, obj in ipairs(Workspace:GetChildren()) do 
+        if obj:IsA("Model") and obj ~= Player.Character then 
+            table.insert(npcs, obj) 
+        end 
+    end
+    return npcs
+end
+
+-----------------------------------
+-- STRICT DAMAGEABLE NPC CHECK
+-----------------------------------
+local function IsDamageableNPC(model)
+    if not model or not model:IsA("Model") then return false end
+    if model == Player.Character then return false end
+    if Players:GetPlayerFromCharacter(model) then return false end
+    
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("PrimaryPart") or model:FindFirstChild("Head")
+    
+    if not hum or not root then return false end
+    if hum.Health <= 0 then return false end
+    if hum.MaxHealth >= 999999 or hum.MaxHealth <= 0 then return false end
+    
+    local nameLower = model.Name:lower()
+    local ignored = {"quest", "shop", "dealer", "manager", "captain", "citizen", "merchant", "setter", "bloxfruit", "gacha", "home", "spawn"}
+    for _, keyword in ipairs(ignored) do
+        if nameLower:find(keyword) then return false end
+    end
+    
+    return true
+end
+
+-----------------------------------
 -- UI SETUP (BLACK UP / PURPLE DOWN)
 -----------------------------------
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BaunaGayGUI"
+ScreenGui.Name = "ZenithHubGUI"
 ScreenGui.ResetOnSpawn = false
 
 local coreGuiExists, coreGui = pcall(function() return game:GetService("CoreGui") end)
@@ -86,7 +130,7 @@ Instance.new("UICorner", NoBtn).CornerRadius = UDim.new(0, 4)
 -- Main Frame Setup
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 240, 0, 380) 
+MainFrame.Size = UDim2.new(0, 240, 0, 395) 
 MainFrame.Position = UDim2.new(0.5, -120, 0.3, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 MainFrame.BorderSizePixel = 0
@@ -107,7 +151,7 @@ local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(1, -70, 0, 32)
 TitleLabel.Position = UDim2.new(0, 10, 0, 0)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "         GANJA HUB"
+TitleLabel.Text = "⚡ ZENITH HUB ⚡"
 TitleLabel.TextColor3 = Color3.fromRGB(220, 180, 255)
 TitleLabel.TextSize = 14
 TitleLabel.Font = Enum.Font.GothamBold
@@ -137,10 +181,20 @@ CloseBtn.Parent = MainFrame
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
 
 local Container = Instance.new("Frame")
-Container.Size = UDim2.new(1, 0, 1, -32)
+Container.Size = UDim2.new(1, 0, 1, -47)
 Container.Position = UDim2.new(0, 0, 0, 32)
 Container.BackgroundTransparency = 1
 Container.Parent = MainFrame
+
+local FooterText = Instance.new("TextLabel")
+FooterText.Size = UDim2.new(1, 0, 0, 15)
+FooterText.Position = UDim2.new(0, 0, 1, -15)
+FooterText.BackgroundTransparency = 1
+FooterText.Text = "Aap gay he"
+FooterText.TextColor3 = Color3.fromRGB(150, 150, 150)
+FooterText.TextSize = 10
+FooterText.Font = Enum.Font.Gotham
+FooterText.Parent = MainFrame
 
 local isMinimized = false
 MinimizeBtn.MouseButton1Click:Connect(function()
@@ -149,20 +203,17 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         MinimizeBtn.Text = "+"
         MainFrame.Size = UDim2.new(0, 240, 0, 32)
         Container.Visible = false
+        FooterText.Visible = false
     else
         MinimizeBtn.Text = "-"
-        MainFrame.Size = UDim2.new(0, 240, 0, 380)
+        MainFrame.Size = UDim2.new(0, 240, 0, 395)
         Container.Visible = true
+        FooterText.Visible = true
     end
 end)
 
-CloseBtn.MouseButton1Click:Connect(function()
-    ConfirmOverlay.Visible = true
-end)
-
-NoBtn.MouseButton1Click:Connect(function()
-    ConfirmOverlay.Visible = false
-end)
+CloseBtn.MouseButton1Click:Connect(function() ConfirmOverlay.Visible = true end)
+NoBtn.MouseButton1Click:Connect(function() ConfirmOverlay.Visible = false end)
 
 local TargetLabel = Instance.new("TextLabel")
 TargetLabel.Size = UDim2.new(0.9, 0, 0, 20)
@@ -291,37 +342,14 @@ UIListLayout.Parent = MobScrollFrame
 UIListLayout.Padding = UDim.new(0, 3)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
------------------------------------
--- STRICT DAMAGEABLE NPC CHECK & MULTI-SELECT
------------------------------------
-local function IsDamageableNPC(model)
-    if not model or not model:IsA("Model") then return false end
-    if model == Player.Character then return false end
-    if Players:GetPlayerFromCharacter(model) then return false end
-    
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("PrimaryPart") or model:FindFirstChild("Head")
-    
-    if not hum or not root then return false end
-    if hum.Health <= 0 then return false end
-    if hum.MaxHealth >= 999999 or hum.MaxHealth <= 0 then return false end
-    
-    local nameLower = model.Name:lower()
-    if nameLower:find("quest") or nameLower:find("shop") or nameLower:find("dealer") or nameLower:find("manager") or nameLower:find("captain") or nameLower:find("citizen") or nameLower:find("merchant") then
-        return false
-    end
-    
-    return true
-end
-
 local function GetAvailableMobs()
     local mobs = {}
     local hash = {}
-    for _, desc in ipairs(Workspace:GetDescendants()) do
-        if IsDamageableNPC(desc) then
-            if not hash[desc.Name] then
-                hash[desc.Name] = true
-                table.insert(mobs, desc.Name)
+    for _, obj in ipairs(getPotentialNPCs()) do
+        if IsDamageableNPC(obj) then
+            if not hash[obj.Name] then
+                hash[obj.Name] = true
+                table.insert(mobs, obj.Name)
             end
         end
     end
@@ -498,7 +526,7 @@ NotifierBtn.MouseButton1Click:Connect(function()
 end)
 
 -----------------------------------
--- MODIFIED USER DAMAGE SYSTEM (FAST ATTACK WITH MULTIPLIER)
+-- OPTIMIZED FAST ATTACK (BUG & LAG FREE)
 -----------------------------------
 _G.FastAttack = true
 if _G.FastAttack then
@@ -508,8 +536,6 @@ if _G.FastAttack then
         return result
     end
     local Remotes = SafeWaitForChild(ReplicatedStorage, "Remotes")
-    local Characters = SafeWaitForChild(Workspace, "Characters")
-    local Enemies = SafeWaitForChild(Workspace, "Enemies")
     local Modules = SafeWaitForChild(ReplicatedStorage, "Modules")
     local Net = SafeWaitForChild(Modules, "Net")
 
@@ -518,29 +544,12 @@ if _G.FastAttack then
 
     Module.FastAttack = (function()
         if _ENV.rz_FastAttack then return _ENV.rz_FastAttack end
-        local FastAttack = { Distance = 500, attackMobs = true, attackPlayers = true, Equipped = nil }
+        local FastAttack = { Distance = 60, attackMobs = true, attackPlayers = true, Equipped = nil }
         local RegisterAttack = SafeWaitForChild(Net, "RE/RegisterAttack")
         local RegisterHit = SafeWaitForChild(Net, "RE/RegisterHit")
 
         local function IsAlive(character)
             return character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0
-        end
-
-        local function ProcessEnemies(OthersEnemies, Folder)
-            local BasePart = nil
-            if not Folder then return BasePart end
-            for _, Enemy in ipairs(Folder:GetChildren()) do
-                if IsDamageableNPC(Enemy) then
-                    if next(targetMobs) == nil or targetMobs[Enemy.Name] then
-                        local Head = Enemy:FindFirstChild("Head")
-                        if Head and Player:DistanceFromCharacter(Head.Position) < FastAttack.Distance then
-                            table.insert(OthersEnemies, { Enemy, Head })
-                            BasePart = Head
-                        end
-                    end
-                end
-            end
-            return BasePart
         end
 
         function FastAttack:Attack(BasePart, OthersEnemies)
@@ -555,38 +564,30 @@ if _G.FastAttack then
 
         function FastAttack:AttackNearest()
             local OthersEnemies = {}
-            local Part1 = ProcessEnemies(OthersEnemies, Enemies)
-            local Part2 = ProcessEnemies(OthersEnemies, Characters)
-
-            local ExtraPart = nil
-            for _, desc in ipairs(Workspace:GetDescendants()) do
-                if IsDamageableNPC(desc) then
-                    if next(targetMobs) == nil or targetMobs[desc.Name] then
-                        local Head = desc:FindFirstChild("Head")
+            local BasePart = nil
+            local char = Player.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            
+            -- Only iterate optimized list, never full Descendants to prevent lag
+            for _, model in ipairs(getPotentialNPCs()) do
+                if IsDamageableNPC(model) then
+                    if next(targetMobs) == nil or targetMobs[model.Name] then
+                        local Head = model:FindFirstChild("Head")
                         if Head and Player:DistanceFromCharacter(Head.Position) < FastAttack.Distance then
-                            local exists = false
-                            for _, eData in ipairs(OthersEnemies) do
-                                if eData[1] == desc then exists = true break end
-                            end
-                            if not exists then
-                                table.insert(OthersEnemies, { desc, Head })
-                                ExtraPart = Head
-                            end
+                            table.insert(OthersEnemies, { model, Head })
+                            if not BasePart then BasePart = Head end
                         end
                     end
                 end
             end
 
-            local character = Player.Character
-            if not character then return end
-            local equippedWeapon = character:FindFirstChildOfClass("Tool")
-
+            local equippedWeapon = char:FindFirstChildOfClass("Tool")
             if equippedWeapon and equippedWeapon:FindFirstChild("LeftClickRemote") then
                 for _, enemyData in ipairs(OthersEnemies) do
                     local enemy = enemyData[1]
                     local hrp = enemy:FindFirstChild("HumanoidRootPart")
                     if hrp then
-                        local direction = (hrp.Position - character:GetPivot().Position).Unit
+                        local direction = (hrp.Position - char:GetPivot().Position).Unit
                         for i = 1, attackMultiplier do
                             task.spawn(function()
                                 pcall(function() equippedWeapon.LeftClickRemote:FireServer(direction, 1) end)
@@ -595,7 +596,7 @@ if _G.FastAttack then
                     end
                 end
             elseif #OthersEnemies > 0 then
-                self:Attack(Part1 or Part2 or ExtraPart, OthersEnemies)
+                self:Attack(BasePart, OthersEnemies)
             end
         end
 
@@ -637,22 +638,23 @@ pcall(function()
     end
 end)
 
+-- Optimized Melee Loop to prevent freezing
 task.spawn(function()
-    while scriptRunning and task.wait(0.05) do
+    while scriptRunning and task.wait(0.1) do
         if not active then continue end 
         local char = Player.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then continue end
         
         local parts = {}
-        for _, desc in ipairs(Workspace:GetDescendants()) do
-            if IsDamageableNPC(desc) then
-                if next(targetMobs) == nil or targetMobs[desc.Name] then
-                    local hrp = desc:FindFirstChild("HumanoidRootPart")
-                    if hrp and (hrp.Position - root.Position).Magnitude <= 60 then
-                        for _, _v in ipairs(desc:GetChildren()) do
+        for _, model in ipairs(getPotentialNPCs()) do
+            if IsDamageableNPC(model) then
+                if next(targetMobs) == nil or targetMobs[model.Name] then
+                    local hrp = model:FindFirstChild("HumanoidRootPart")
+                    if hrp and (hrp.Position - root.Position).Magnitude <= 65 then
+                        for _, _v in ipairs(model:GetChildren()) do
                             if _v:IsA("BasePart") then
-                                parts[#parts+1] = {desc, _v}
+                                parts[#parts+1] = {model, _v}
                             end
                         end
                     end
@@ -684,7 +686,7 @@ task.spawn(function()
 end)
 
 -----------------------------------
--- MOVEMENT & SUSPENSION SYSTEM 
+-- NEAREST NPC MOVEMENT & SUSPENSION
 -----------------------------------
 local function applySuspension(hrp)
     local bv = hrp:FindFirstChild("AutoFarmVelocity")
@@ -714,11 +716,11 @@ local function getNearestNPC()
     local nearestHumanoid = nil
     local shortestDist = math.huge
 
-    for _, desc in ipairs(Workspace:GetDescendants()) do
-        if IsDamageableNPC(desc) then
-            if next(targetMobs) == nil or targetMobs[desc.Name] then
-                local targetHrp = desc:FindFirstChild("HumanoidRootPart") or desc:FindFirstChild("PrimaryPart")
-                local hum = desc:FindFirstChildOfClass("Humanoid")
+    for _, model in ipairs(getPotentialNPCs()) do
+        if IsDamageableNPC(model) then
+            if next(targetMobs) == nil or targetMobs[model.Name] then
+                local targetHrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("PrimaryPart")
+                local hum = model:FindFirstChildOfClass("Humanoid")
                 if targetHrp and hum then
                     local dist = (hrp.Position - targetHrp.Position).Magnitude
                     if dist < shortestDist then
@@ -828,10 +830,7 @@ TPBtn.MouseButton1Click:Connect(function()
     if CurrentFruit then
         local handle = CurrentFruit:FindFirstChild("Handle") or CurrentFruit:FindFirstChildOfClass("Part") or CurrentFruit:FindFirstChildOfClass("MeshPart")
         if handle then
-            if active then
-                toggleScript() 
-            end
-            
+            if active then toggleScript() end
             if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
                 Player.Character.HumanoidRootPart.CFrame = CFrame.new(handle.Position + Vector3.new(0, 4, 0))
                 StatusLabel.Text = "Teleported to " .. getFruitName(CurrentFruit)
